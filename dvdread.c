@@ -57,7 +57,10 @@ int main(int argc, char *argv[]) {
     s1 = (argc < 3) ? 0 : atoi(argv[2]);
     s2 = (argc < 4) ? -1 : atoi(argv[3]);
     prdr = DVDOpen(argv[1]);
-    if (prdr == NULL) goto E1;
+    if (prdr == NULL) {
+        fprintf(stderr, "can't open %s\n", argv[1]);
+        return 1;
+    }
     for (t = 0; t < MAXTITLES; t++) {
         if (t == 0) {
             snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VIDEO_TS.VOB");
@@ -119,7 +122,7 @@ STDERR:
 CSSERR:
     fprintf(stderr, "%s - %s\n", st, dvdcss_error(dvdcss));
     dvdcss_close(dvdcss);
-E1: return 1;
+    return 1;
 }
 
 /* Dumps DVDCSS_BLOCK_SIZE bytes buffer to stdout */
