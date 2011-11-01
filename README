@@ -1,16 +1,72 @@
-The dvdread utility allows you to create deCSSed image of protected DVD.
-What you do with the resulting image is your own business, not Sony's or
-Some Other Guy's one.
+The dvdread utility allows you to create deCSSed image of protected
+DVD. What you do with the resulting image is your own business, not
+Sony's or Some Other Guy's one. If you attempt to read scrambled DVD
+directly with cp/dd/readom, you'll get I/O error (Read of scrambled
+sector without authentication) on all scrambled sectors and any
+workarounds like dd_rescue will just produce damaged MPEG.
+
+dvdread depends on libdvdcss2 and libdvdread4 libraries (these are
+Debian GNU/Linux names for libdvdcss-1.2.x and libdvdread-4.y.z). To
+build dvdread from source, you'll need development versions of the
+libraries (libdvdcss-dev and libdvdread-dev on Debian).
 
 Example usage:
 ./dvdread /dev/sr0 >/mnt/sdb1/vx/Katsuhiro\ Otomo/akira_decss.iso
 
 dvdread prints progress and error messages to stderr and dumps deCSSed
-stream to stdout. If you want to debug, run it with DVDCSS_VERBOSE envvar,
-e.g.:
+stream to stdout. If you want to debug, run it with DVDCSS_VERBOSE
+envvar, e.g.:
 DVDCSS_VERBOSE=2 ./dvdread /dev/sr0 >/x/y/z
 
-dvdread depends on libdvdcss2 and libdvdread4 libraries (these are Debian
-GNU/Linux names for libdvdcss-1.2.x and libdvdread-4.y.z). To build dvdread
-from source, you'll need development versions of the libraries (libdvdcss-dev
-and libdvdread-dev on Debian).
+dvdread Operation
+
+1. dvdread uses libdvdcss to authenticate itself to DVD drive using
+   special IOCTLs, and this eliminates "Read of scrambled sector
+   without authentication" errors.
+
+2. These scrambled sectors must still be descrambled (deCSSed)
+   afterwards, using correct Title Key. dvdread uses libdvdread to
+   locate start-end sectors for all titles on disk and re-issues
+   DVDCSS_SEEK_KEY when entering corresponding sector areas (resulting
+   in single DVDCSS_SEEK_KEY operation per title). If you do
+   DVDCSS_SEEK_KEY for each sector instead, ripping will be way too
+   slow.
+
+dvdread Problems
+
+dvdread may fail due to region mismatch. For some DVDs you may be able
+to rip using wrong region and for some you may not. This happens
+because drive refuses to decrypt title keys for mismatched region and
+libdvdcss attempts to crack title keys itself. Cracking depends on
+plaintext content and doesn't always work:
+
+sector 2009702: libdvdcss debug: getting title key at block 2009702 the classic way
+libdvdcss debug: requesting AGID
+libdvdcss debug: drive authenticated, using variant 0
+libdvdcss debug: authentication established
+libdvdcss debug: ioctl ReadTitleKey failed (region mismatch?)
+libdvdcss debug: GetASF not authenticated, ASF=0
+libdvdcss debug: lost ASF requesting title key
+libdvdcss debug: resetting drive and cracking title key
+libdvdcss debug: requesting AGID
+libdvdcss debug: ioctl ReportAgid failed, invalidating AGID 0
+libdvdcss debug: requesting AGID
+libdvdcss debug: drive authenticated, using variant 0
+libdvdcss debug: authentication established
+libdvdcss debug: GetASF authenticated, ASF=1
+libdvdcss debug: decrypting disc key 7d:8b:c2:73:bd
+libdvdcss debug: trying player key 01:af:e3:12:80
+libdvdcss debug: decrypted disc key is 00:77:36:36:ee
+libdvdcss debug: cracking title key at block 2009702
+libdvdcss debug: at block 2013798, still cracking...
+libdvdcss debug: at block 2017894, still cracking...
+libdvdcss debug: at block 2021990, still cracking...
+libdvdcss debug: at block 2026086, still cracking...
+libdvdcss debug: at block 2030182, still cracking...
+libdvdcss debug: at block 2034278, still cracking...
+libdvdcss debug: at block 2038374, still cracking...
+libdvdcss debug: non MPEG block found at block 2038483 (end of title)
+libdvdcss debug: end of title reached
+libdvdcss debug: successful attempts 0/0, scrambled blocks 13734/28781
+libdvdcss debug: title key is 00:00:00:00:00
+libdvdcss error: fatal error in vts css key
