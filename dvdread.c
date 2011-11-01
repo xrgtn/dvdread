@@ -60,18 +60,18 @@ int main(int argc, char *argv[]) {
     prdr = DVDOpen(argv[1]);
     if (prdr == NULL) goto E1;
     for (t = 0; t < MAXTITLES; t++) {
-	if (t == 0) {
+        if (t == 0) {
             snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VIDEO_TS.VOB");
         } else snprintf(tfname, sizeof(tfname),
             "/VIDEO_TS/VTS_%02d_%d.VOB", t, 0);
-	start = UDFFindFile(prdr, tfname, &len);
-	if (start && len) addvob(tfname, start, len);
-	if (!t) continue;
+        start = UDFFindFile(prdr, tfname, &len);
+        if (start && len) addvob(tfname, start, len);
+        if (!t) continue;
         snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VTS_%03d_%d.VOB",
             t, 1);
-	start = UDFFindFile(prdr, tfname, &len);
-	if (start && len) addvob(tfname, start, len);
-	if (!start || !len) break;
+        start = UDFFindFile(prdr, tfname, &len);
+        if (start && len) addvob(tfname, start, len);
+        if (!start || !len) break;
     }
     DVDClose(prdr);
     /* Initialize libdvdcss */
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     if (dvdcss_is_scrambled(dvdcss))
-	fprintf(stderr, "%s disk is scrambled\n", argv[1]);
+        fprintf(stderr, "%s disk is scrambled\n", argv[1]);
     /* Align our read buffer */
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
