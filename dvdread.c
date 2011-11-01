@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         start = UDFFindFile(prdr, tfname, &len);
         if (start && len) addvob(tfname, start, len);
         if (!t) continue;
-        snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VTS_%03d_%d.VOB",
+        snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VTS_%02d_%d.VOB",
             t, 1);
         start = UDFFindFile(prdr, tfname, &len);
         if (start && len) addvob(tfname, start, len);
