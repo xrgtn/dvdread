@@ -1,0 +1,16 @@
+The dvdread utility allows you to create deCSSed image of protected DVD.
+What you do with the resulting image is your own business, not Sony's or
+Some Other Guy's one.
+
+Example usage:
+./dvdread /dev/sr0 >/mnt/sdb1/vx/Katsuhiro\ Otomo/akira_decss.iso
+
+dvdread prints progress and error messages to stderr and dumps deCSSed
+stream to stdout. If you want to debug, run it with DVDCSS_VERBOSE envvar,
+e.g.:
+DVDCSS_VERBOSE=2 ./dvdread /dev/sr0 >/x/y/z
+
+dvdread depends on libdvdcss2 and libdvdread4 libraries (these are Debian
+GNU/Linux names for libdvdcss-1.2.x and libdvdread-4.y.z). To build dvdread
+from source, you'll need development versions of the libraries (libdvdcss-dev
+and libdvdread-dev on Debian).
