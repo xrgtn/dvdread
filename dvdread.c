@@ -27,10 +27,9 @@ static int findvob(int pos) {
 static int addvob(char *tfname, int start, int len) {
     int end = start + (len + DVD_VIDEO_LB_LEN - 1) / DVD_VIDEO_LB_LEN;
     if (nvobs >= MAXVOBS) {
-        fprintf(stderr, "skipped %s [%u -- %u)\n", tfname, start, end);
+        fprintf(stderr, "can't add %s [%u -- %u)\n", tfname, start, end);
         return 0;
     }
-    fprintf(stderr, "added %s [%u -- %u)\n", tfname, start, end);
     strncpy(vob[nvobs].fname, tfname, sizeof(vob[nvobs].fname));
     vob[nvobs].start = start;
     vob[nvobs++].end = end;
@@ -45,7 +44,7 @@ int main(int argc, char *argv[]) {
     unsigned int  s, s1, s2;
     char tfname[23];
     uint32_t start, len;
-    int t, curvob, r;
+    int t, curvob, newvob, r;
     char *st = "init";
     /* usage */
     if (argc < 2 || argc > 4) {
@@ -86,10 +85,14 @@ int main(int argc, char *argv[]) {
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
     for (s = s1, curvob = -1; s < s2; s++) {
-        fprintf(stderr, "\rsector %u: ", s);
+        newvob = curvob;
         if (curvob < 0 || s < vob[curvob].start
                 || vob[curvob].end <= s)
-            curvob = findvob(s);
+            newvob = findvob(s);
+        if (newvob != curvob && s != s1) fprintf(stderr, "\n");
+        fprintf(stderr, "\rsector %u ", s);
+        if (newvob >= 0) fprintf(stderr, "(%s) ", vob[newvob].fname);
+        curvob = newvob;
         st = "seek";
         if (curvob >= 0 && s == vob[curvob].start) {
             st = "seek key";
@@ -104,7 +107,6 @@ int main(int argc, char *argv[]) {
         if (r == 0) goto EOFDVD;
         if (r != 1) goto CSSERR;
         if (!dumpsector(p_buffer)) goto STDERR;
-        fprintf(stderr, "ok");
     }
 EOFDVD:
     fprintf(stderr, "end of file %s\n", argv[1]);
