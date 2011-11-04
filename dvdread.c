@@ -13,7 +13,8 @@ struct se_s {
 };
 typedef struct se_s se_t;
 #define MAXTITLES 100
-#define MAXVOBS 200
+#define MAXVOBS 1000
+#define MAXVTSVOBS 10
 se_t vob[MAXVOBS];
 int nvobs = 0;
 
@@ -44,7 +45,7 @@ int main(int argc, char *argv[]) {
     unsigned int  s, s1, s2;
     char tfname[23];
     uint32_t start, len;
-    int t, curvob, newvob, r;
+    int t, v, curvob, newvob, r;
     char *st = "init";
     /* usage */
     if (argc < 2 || argc > 4) {
@@ -61,19 +62,18 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "can't open %s\n", argv[1]);
         return 1;
     }
+    snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VIDEO_TS.VOB");
+    start = UDFFindFile(prdr, tfname, &len);
+    if (start && len) addvob(tfname, start, len);
     for (t = 0; t < MAXTITLES; t++) {
-        if (t == 0) {
-            snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VIDEO_TS.VOB");
-        } else snprintf(tfname, sizeof(tfname),
-            "/VIDEO_TS/VTS_%02d_%d.VOB", t, 0);
-        start = UDFFindFile(prdr, tfname, &len);
-        if (start && len) addvob(tfname, start, len);
-        if (!t) continue;
-        snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VTS_%02d_%d.VOB",
-            t, 1);
-        start = UDFFindFile(prdr, tfname, &len);
-        if (start && len) addvob(tfname, start, len);
-        if (!start || !len) break;
+        for (v = 0; v < MAXVTSVOBS; v++) {
+            snprintf(tfname, sizeof(tfname),
+                "/VIDEO_TS/VTS_%02d_%d.VOB", t, v);
+            start = UDFFindFile(prdr, tfname, &len);
+            if (!start || !len) break;
+            addvob(tfname, start, len);
+        }
+        if (t != 0 && v == 0 && (!start || !len)) break;
     }
     DVDClose(prdr);
     /* Initialize libdvdcss */
@@ -95,14 +95,14 @@ int main(int argc, char *argv[]) {
         if (newvob != curvob && s != s1) fprintf(stderr, "\n");
         fprintf(stderr, "\rsector %u ", s);
         if (newvob >= 0) fprintf(stderr, "(%s) ", vob[newvob].fname);
-        curvob = newvob;
         st = "seek";
-        if (curvob >= 0 && s == vob[curvob].start) {
+        if (curvob != newvob) {
             st = "seek key";
             r = dvdcss_seek(dvdcss, s, DVDCSS_SEEK_KEY);
         } else r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
         if (r != (int)s) goto CSSERR;
         st = "read";
+        curvob = newvob;
         if (curvob >= 0) {
             st = "decrypt";
             r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_READ_DECRYPT);
