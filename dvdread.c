@@ -13,8 +13,8 @@ struct se_s {
 };
 typedef struct se_s se_t;
 #define MAXTITLES 100
-#define MAXVOBS 1000
 #define MAXVTSVOBS 10
+#define MAXVOBS (MAXTITLES*MAXVTSVOBS)
 se_t vob[MAXVOBS];
 int nvobs = 0;
 
