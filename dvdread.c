@@ -58,10 +58,10 @@ int main(int argc, char *argv[]) {
     dvdcss_t dvdcss;
     unsigned char p_data[DVDCSS_BLOCK_SIZE * 2];
     unsigned char *p_buffer;
-    unsigned int  s, s1, s2;
+    unsigned int  s, ss, s1, s2;
     char tfname[23];
     uint32_t start, len;
-    int t, v, curvob, newvob, r;
+    int t, v, curvob, s_vob, r;
     char *st = "init";
     /* usage */
     if (argc < 2 || argc > 4) {
@@ -103,22 +103,31 @@ int main(int argc, char *argv[]) {
     /* Align our read buffer */
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
-    for (s = s1, curvob = -1; s < s2; s++) {
-        newvob = curvob;
+    for (s = s1, ss = s1, curvob = -1; s < s2; s++) {
+        s_vob = curvob;
         if (curvob < 0 || s < vob[curvob].start
                 || vob[curvob].end <= s)
-            newvob = findvob(s);
-        if (newvob != curvob && s != s1) fprintf(stderr, "\n");
-        fprintf(stderr, "\rsector %u ", s);
-        if (newvob >= 0) fprintf(stderr, "(%s) ", vob[newvob].fname);
+            s_vob = findvob(s);
+        /* Advance to new line if VOB/section changes: */
+        if (s_vob != curvob && s != s1) {
+            fprintf(stderr, "\n");
+            ss = s;
+        };
+        /* Print current sector or sectors range: */
+        if (s == ss) fprintf(stderr, "\r%u ", s);
+        else fprintf(stderr, "\r%u - %u ", ss, s);
+        /* Append VOB name if any: */
+        if (s_vob >= 0) fprintf(stderr, "(%s) ", vob[s_vob].fname);
+        /* Seek for VOB key if VOB changes, skip otherwise: */
         st = "seek";
-        if (curvob != newvob) {
+        if (curvob != s_vob) {
             st = "seek key";
             r = dvdcss_seek(dvdcss, s, DVDCSS_SEEK_KEY);
         } else r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
         if (r != (int)s) goto CSSERR;
+        /* Decrypt if inside VOB, read plain data otherwise: */
         st = "read";
-        curvob = newvob;
+        curvob = s_vob;
         if (curvob >= 0) {
             st = "decrypt";
             r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_READ_DECRYPT);
