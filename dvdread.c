@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
         if (s_vob >= 0) fprintf(stderr, "(%s) ", vob[s_vob].fname);
         /* Seek for VOB key if VOB changes, skip otherwise: */
         st = "seek";
-        if (curvob != s_vob) {
+        if (s_vob >= 0 && curvob != s_vob) {
             st = "seek key";
             r = dvdcss_seek(dvdcss, s, DVDCSS_SEEK_KEY);
         } else r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
