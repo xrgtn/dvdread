@@ -11,7 +11,16 @@ build dvdread from source, you'll need development versions of the
 libraries (libdvdcss-dev and libdvdread-dev on Debian).
 
 Example usage:
-./dvdread /dev/sr0 >/mnt/sdb1/vx/Katsuhiro\ Otomo/akira_decss.iso
+./dvdread /dev/sr0 >akira_decss.iso
+mplayer -dvd-device akira_decss.iso dvdnav://menu
+
+The produced .iso file still contains original DVD region restriction
+mask inside the VIDEO_TS.IFO and VIDEO_TS.BUP files. This mask is a
+single byte at offset 0x23 in the mentioned two files (cf
+http://dvdnav.mplayerhq.hu/dvdinfo/ifo.html). For example, for region 1
+DVDs this byte contains 0xFE. If you burn .iso image onto DVD-R/RW
+disc without first resetting regmask to zero, the resulting disc may
+and most probably will be unplayable by hardware-based DVD players.
 
 dvdread prints progress and error messages to stderr and dumps deCSSed
 stream to stdout. If you want to debug, run it with DVDCSS_VERBOSE
@@ -34,11 +43,18 @@ dvdread Operation
 
 dvdread Problems
 
-dvdread may fail due to region mismatch. For some DVDs you may be able
-to rip using wrong region and for some you may not. This happens
-because drive refuses to decrypt title keys for mismatched region and
-libdvdcss attempts to crack title keys itself. Cracking depends on
-plaintext content and doesn't always work:
+1. dvdread doesn't modify region mask in VIDEO_TS.IFO/BUP files.
+   Therefore .iso files produced by it require manual zeroing of
+   regmask before writing to DVD-R/RW media.
+
+2. dvdread doesn't reset UOP restrictions too
+   (cf https://en.wikipedia.org/wiki/User_operation_prohibition).
+
+3. dvdread may fail due to region mismatch. For some DVDs you may be
+   able to rip using wrong region and for some you may not. This
+   happens because drive refuses to decrypt title keys for mismatched
+   region and libdvdcss attempts to crack title keys itself. Cracking
+   depends on plaintext content and doesn't always work:
 
 sector 2009702: libdvdcss debug: getting title key at block 2009702 the classic way
 libdvdcss debug: requesting AGID
