@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     /* Align our read buffer */
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
-    for (s = s1, ss = s1, lastvob = -1; s < s2; s++) {
+    for (s = s1, ss = s1, lastvob = -1; s < s2; s++, lastvob = s_vob) {
         if (lastvob >= 0 && s >= vob[lastvob].start
                 && s < vob[lastvob].end) {
             s_vob = lastvob;
@@ -128,12 +128,13 @@ int main(int argc, char *argv[]) {
         } else r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
         if (r != (int)s) goto CSSERR;
         /* Decrypt if inside VOB, read plain data otherwise: */
-        st = "read";
-        lastvob = s_vob;
-        if (lastvob >= 0) {
+        if (s_vob >= 0) {
             st = "decrypt";
             r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_READ_DECRYPT);
-        } else r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_NOFLAGS);
+        } else {
+            st = "read";
+            r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_NOFLAGS);
+        };
         if (r == 0) goto EOFDVD;
         if (r != 1) goto CSSERR;
         if (!dumpsector(p_buffer)) goto STDERR;
