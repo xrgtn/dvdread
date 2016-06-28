@@ -136,7 +136,18 @@ int main(int argc, char *argv[]) {
             r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_NOFLAGS);
         };
         if (r == 0) goto EOFDVD;
-        if (r != 1) goto CSSERR;
+        if (r != 1) {
+            if (s != ss) {
+                /* Print error warning: */
+                fprintf(stderr, "\n%u ", s);
+                if (s_vob >= 0)
+                    fprintf(stderr, "(%s) ", vob[s_vob].fname);
+                fprintf(stderr, "%s - %s\n", st, dvdcss_error(dvdcss));
+                ss = s;
+            };
+            /* XXX: substitute zeroes for bad sector data: */
+            memset(p_buffer, '\0', DVDCSS_BLOCK_SIZE);
+        };
         if (!dumpsector(p_buffer)) goto STDERR;
     }
 EOFDVD:
