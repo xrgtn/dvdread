@@ -104,10 +104,12 @@ int main(int argc, char *argv[]) {
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
     for (s = s1, ss = s1, lastvob = -1; s < s2; s++) {
-        s_vob = lastvob;
-        if (lastvob < 0 || s < vob[lastvob].start
-                || vob[lastvob].end <= s)
+        if (lastvob >= 0 && s >= vob[lastvob].start
+                && s < vob[lastvob].end) {
+            s_vob = lastvob;
+        } else {
             s_vob = findvob(s);
+        };
         /* Advance to new line if VOB/section changes: */
         if (s_vob != lastvob && s != s1) {
             fprintf(stderr, "\n");
