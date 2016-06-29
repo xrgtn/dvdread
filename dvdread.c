@@ -22,34 +22,79 @@
 #include <dvdcss/dvdcss.h>
 
 static int dumpsector(unsigned char *);
-struct se_s {
+enum vts_file_type_t {
+    other,
+    vmg_ifo,
+    vmg_vob,
+    vmg_bup,
+    vts_ifo,
+    vts_vob,
+    vts_bup
+};
+struct vts_file_extent_s {
     char fname[23];
+    int type;
     unsigned int start;
     unsigned int end;
 };
-typedef struct se_s se_t;
+typedef struct vts_file_extent_s vts_file_extent_t;
 #define MAXTITLES 100
 #define MAXVTSVOBS 10
-#define MAXVOBS (MAXTITLES*MAXVTSVOBS)
-se_t vob[MAXVOBS];
-int nvobs = 0;
+#define MAXVFILES (MAXTITLES*(MAXVTSVOBS+2)+2)
+vts_file_extent_t file[MAXVFILES];
+int nfiles = 0;
 
-static int findvob(int pos) {
+static int findfile(int pos) {
     int i;
-    for (i = 0; i < nvobs; i++) {
-        if (vob[i].start <= pos && pos < vob[i].end) return i;
+    for (i = 0; i < nfiles; i++) {
+        if (file[i].start <= pos && pos < file[i].end) return i;
     }
     return -1;
 }
-static int addvob(char *tfname, int start, int len) {
+static int addfile(char *fname, int start, int len) {
+    char *bname, *ext;
+    int type, title, part;
     int end = start + (len + DVD_VIDEO_LB_LEN - 1) / DVD_VIDEO_LB_LEN;
-    if (nvobs >= MAXVOBS) {
-        fprintf(stderr, "can't add %s [%u -- %u)\n", tfname, start, end);
+    if (fname == NULL) return 0;
+    if (nfiles >= MAXVFILES) {
+        fprintf(stderr, "can't add %s [%u -- %u)\n", fname, start, end);
         return 0;
-    }
-    strncpy(vob[nvobs].fname, tfname, sizeof(vob[nvobs].fname));
-    vob[nvobs].start = start;
-    vob[nvobs++].end = end;
+    };
+    bname = strrchr(fname, '/');
+    bname = (bname == NULL) ? fname : bname + 1;
+    ext = strrchr(bname, '.');
+    if (ext == NULL) {
+        type = 0;
+    } else if (0 == strcasecmp(ext, ".IFO")) {
+        type = 1;
+    } else if (0 == strcasecmp(ext, ".VOB")) {
+        type = 2;
+    } else if (0 == strcasecmp(ext, ".BUP")) {
+        type = 3;
+    } else {
+        type = 0;
+    };
+    if (type != 0) {
+        if (0 == strncasecmp(bname, "VIDEO_TS", ext - bname)) {
+        } else if (2 == sscanf(bname, "VTS_%d_%d", &title, &part)) {
+            type += 3;
+        } else {
+            type = 0;
+        };
+    };
+    switch (type) {
+        case 1: file[nfiles].type = vmg_ifo; break;
+        case 2: file[nfiles].type = vmg_vob; break;
+        case 3: file[nfiles].type = vmg_bup; break;
+        case 4: file[nfiles].type = vts_ifo; break;
+        case 5: file[nfiles].type = vts_vob; break;
+        case 6: file[nfiles].type = vts_bup; break;
+        default: file[nfiles].type = other; break;
+    };
+    strncpy(file[nfiles].fname, fname, sizeof(file[nfiles].fname));
+    file[nfiles].fname[sizeof(file[nfiles].fname) - 1] = '\0';
+    file[nfiles].start = start;
+    file[nfiles++].end = end;
     return 1;
 }
 
@@ -59,9 +104,13 @@ int main(int argc, char *argv[]) {
     unsigned char p_data[DVDCSS_BLOCK_SIZE * 2];
     unsigned char *p_buffer;
     unsigned int  s, ss, s1, s2;
-    char tfname[23];
+    char fname[23];
     uint32_t start, len;
-    int t, v, lastvob, s_vob, r;
+    int t, v, lastfile, curfile, r;
+    char *vmgfname[] = {
+        "/VIDEO_TS/VIDEO_TS.IFO",
+        "/VIDEO_TS/VIDEO_TS.VOB",
+        "/VIDEO_TS/VIDEO_TS.BUP"};
     char *st = "init";
     /* usage */
     if (argc < 2 || argc > 4) {
@@ -78,18 +127,25 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "can't open %s\n", argv[1]);
         return 1;
     }
-    snprintf(tfname, sizeof(tfname), "/VIDEO_TS/VIDEO_TS.VOB");
-    start = UDFFindFile(prdr, tfname, &len);
-    if (start && len) addvob(tfname, start, len);
+    for (t = 0; t < sizeof(vmgfname) / sizeof(vmgfname[0]); t++) {
+        start = UDFFindFile(prdr, vmgfname[t], &len);
+        if (start && len) addfile(vmgfname[t], start, len);
+    }
     for (t = 0; t < MAXTITLES; t++) {
+        snprintf(fname, sizeof(fname), "/VIDEO_TS/VTS_%02d_0.IFO", t);
+        start = UDFFindFile(prdr, fname, &len);
+        if (start && len) addfile(fname, start, len);
         for (v = 0; v < MAXVTSVOBS; v++) {
-            snprintf(tfname, sizeof(tfname),
+            snprintf(fname, sizeof(fname),
                 "/VIDEO_TS/VTS_%02d_%d.VOB", t, v);
-            start = UDFFindFile(prdr, tfname, &len);
+            start = UDFFindFile(prdr, fname, &len);
             if (!start || !len) break;
-            addvob(tfname, start, len);
+            addfile(fname, start, len);
         }
         if (t != 0 && v == 0 && (!start || !len)) break;
+        snprintf(fname, sizeof(fname), "/VIDEO_TS/VTS_%02d_0.BUP", t);
+        start = UDFFindFile(prdr, fname, &len);
+        if (start && len) addfile(fname, start, len);
     }
     DVDClose(prdr);
     /* Initialize libdvdcss */
@@ -103,32 +159,36 @@ int main(int argc, char *argv[]) {
     /* Align our read buffer */
     p_buffer = p_data + DVDCSS_BLOCK_SIZE
         - ((long int)p_data & (DVDCSS_BLOCK_SIZE-1));
-    for (s = s1, ss = s1, lastvob = -1; s < s2; s++, lastvob = s_vob) {
-        if (lastvob >= 0 && s >= vob[lastvob].start
-                && s < vob[lastvob].end) {
-            s_vob = lastvob;
-        } else {
-            s_vob = findvob(s);
-        };
-        /* Advance to new line if VOB/section changes: */
-        if (s_vob != lastvob && s != s1) {
+    for (s = s1, ss = s1, lastfile = -1, curfile = -1; s < s2;
+            s++, lastfile = curfile) {
+        if (curfile < 0 || s < file[curfile].start
+                || s >= file[curfile].end)
+            curfile = findfile(s);
+        /* Advance to new line if file/section changes: */
+        if (curfile != lastfile && s != s1) {
             fprintf(stderr, "\n");
             ss = s;
         };
         /* Print current sector or sectors range: */
         if (s == ss) fprintf(stderr, "\r%u ", s);
         else fprintf(stderr, "\r%u - %u ", ss, s);
-        /* Append VOB name if any: */
-        if (s_vob >= 0) fprintf(stderr, "(%s) ", vob[s_vob].fname);
-        /* Seek for VOB key if VOB changes, skip otherwise: */
-        st = "seek";
-        if (s_vob >= 0 && lastvob != s_vob) {
+        /* Append file name if any: */
+        if (curfile >= 0)
+            fprintf(stderr, "(%s) ", file[curfile].fname);
+        /* Seek for VOB key if entering new VOB, skip otherwise: */
+        if (curfile >= 0 && (file[curfile].type == vmg_vob
+                    || file[curfile].type == vts_vob)
+                && curfile != lastfile) {
             st = "seek key";
             r = dvdcss_seek(dvdcss, s, DVDCSS_SEEK_KEY);
-        } else r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
+        } else {
+            st = "seek";
+            r = dvdcss_seek(dvdcss, s, DVDCSS_NOFLAGS);
+        };
         if (r != (int)s) goto CSSERR;
         /* Decrypt if inside VOB, read plain data otherwise: */
-        if (s_vob >= 0) {
+        if (curfile >= 0 && (file[curfile].type == vmg_vob
+                    || file[curfile].type == vts_vob)) {
             st = "decrypt";
             r = dvdcss_read(dvdcss, p_buffer, 1, DVDCSS_READ_DECRYPT);
         } else {
@@ -140,8 +200,8 @@ int main(int argc, char *argv[]) {
             if (s != ss) {
                 /* Replace current sector/range prefix: */
                 fprintf(stderr, "\n%u ", s);
-                if (s_vob >= 0)
-                    fprintf(stderr, "(%s) ", vob[s_vob].fname);
+                if (curfile >= 0)
+                    fprintf(stderr, "(%s) ", file[curfile].fname);
                 ss = s;
             };
             /* Print error warning: */
