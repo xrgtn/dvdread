@@ -196,12 +196,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "\n");
             ss = s;
         };
-        /* Print current sector or sectors range: */
-        if (s == ss) fprintf(stderr, "\r%u ", s);
-        else fprintf(stderr, "\r%u - %u ", ss, s);
-        /* Append file name if any: */
-        if (curfile >= 0)
-            fprintf(stderr, "(%s) ", file[curfile].fname);
+        /* Print current sector/range/filename: */
+        ss_fprintf(&ss, s, file, curfile, 0, stderr, "");
         /* Seek for VOB key if entering new VOB, skip otherwise: */
         if (curfile >= 0 && (file[curfile].type == vmg_vob
                     || file[curfile].type == vts_vob)
@@ -224,16 +220,9 @@ int main(int argc, char *argv[]) {
         };
         if (r == 0) goto EOFDVD;
         if (r != 1) {
-            /* Report each bad sector on separate line: */
-            if (s > ss) {
-                fprintf(stderr, "\n%u ", s);
-                if (curfile >= 0)
-                    fprintf(stderr, "(%s) ", file[curfile].fname);
-                /* Restart sectors range after the error: */
-                ss = s + 1;
-            };
             /* Print error warning: */
-            fprintf(stderr, "%s - %s\n", st, dvdcss_error(dvdcss));
+            ss_fprintf(&ss, s, file, curfile, 1, stderr,
+                    "%s - %s\n", st, dvdcss_error(dvdcss));
             /* XXX: substitute zeroes for bad sector data: */
             memset(p_buffer, '\0', DVDCSS_BLOCK_SIZE);
         } else {
