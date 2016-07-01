@@ -197,12 +197,13 @@ int main(int argc, char *argv[]) {
         };
         if (r == 0) goto EOFDVD;
         if (r != 1) {
-            if (s != ss) {
-                /* Replace current sector/range prefix: */
+            /* Report each bad sector on separate line: */
+            if (s > ss) {
                 fprintf(stderr, "\n%u ", s);
                 if (curfile >= 0)
                     fprintf(stderr, "(%s) ", file[curfile].fname);
-                ss = s;
+                /* Restart sectors range after the error: */
+                ss = s + 1;
             };
             /* Print error warning: */
             fprintf(stderr, "%s - %s\n", st, dvdcss_error(dvdcss));
