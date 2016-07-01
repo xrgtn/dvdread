@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <dvdread/dvd_reader.h>
 #include <dvdread/dvd_udf.h>
 #include <dvdcss/dvdcss.h>
@@ -98,6 +99,32 @@ static int addfile(char *fname, int start, int len) {
     return 1;
 }
 
+/* Print message for current sector or sectors range: */
+int ss_fprintf(unsigned *ss, unsigned s, vts_file_extent_t *file,
+        int curfile, int separate, FILE *f, const char *fmt, ...) {
+    va_list args0, args1;
+    int nprinted = 0;
+    va_start(args0, fmt);
+    if (separate) {
+        /* Separate the sector prefix from previous sector range: */
+        if (*ss < s) {
+            nprinted += fprintf(f, "\n%u ", s);
+        };
+        *ss = s + 1;
+    } else {
+        /* Print current sector or sectors range: */
+        nprinted += (*ss < s) ? fprintf(f, "\r%u - %u ", *ss, s)
+            : fprintf(f, "\r%u ", s);
+        if (curfile >= 0)
+            nprinted += fprintf(f, "(%s) ", file[curfile].fname);
+    };
+    va_copy(args1, args0);
+    nprinted += vfprintf(f, fmt, args1);
+    va_end(args1);
+    va_end(args0);
+    return nprinted;
+}
+
 int main(int argc, char *argv[]) {
     dvd_reader_t *prdr = NULL;
     dvdcss_t dvdcss;
@@ -106,7 +133,7 @@ int main(int argc, char *argv[]) {
     unsigned int  s, ss, s1, s2;
     char fname[23];
     uint32_t start, len;
-    int t, v, lastfile, curfile, r;
+    int t, v, lastfile, curfile, r, stripreg;
     char *vmgfname[] = {
         "/VIDEO_TS/VIDEO_TS.IFO",
         "/VIDEO_TS/VIDEO_TS.VOB",
@@ -209,6 +236,28 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "%s - %s\n", st, dvdcss_error(dvdcss));
             /* XXX: substitute zeroes for bad sector data: */
             memset(p_buffer, '\0', DVDCSS_BLOCK_SIZE);
+        } else {
+            /* Report/modify region restriction mask in the 1st sector
+             * of VMG IFO and BUP files: */
+            if (curfile >= 0 && (file[curfile].type == vmg_ifo
+                        || file[curfile].type == vmg_bup)
+                    && s == file[curfile].start) {
+                if (0 == strncasecmp(p_buffer, "DVDVIDEO-VMG", 12)) {
+                    switch (p_buffer[0x23]) {
+                        case 0x00:
+                        case 0xC0: stripreg = 0; break;
+                        default:   stripreg = 1; break;
+                    };
+                    ss_fprintf(&ss, s, file, curfile, 1, stderr,
+                            "%sreg.mask 0x%02X\n",
+                            stripreg ? "stripping " : "",
+                            (unsigned) p_buffer[0x23]);
+                    if (stripreg) p_buffer[0x23] = 0xC0;
+                } else {
+                    ss_fprintf(&ss, s, file, curfile, 1, stderr,
+                            "missing DVDVIDEO-VMG\n");
+                };
+            };
         };
 
         if (!dumpsector(p_buffer)) goto STDERR;
